@@ -41,7 +41,10 @@ DATA_UPLOADS_DIR = Path(__file__).resolve().parent / "data_uploads"
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     Base.metadata.create_all(bind=engine)
-    DATA_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        DATA_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
     db = SessionLocal()
     try:
         get_or_create_settings(db)
@@ -149,12 +152,14 @@ def _student_to_summary(
 
 
 @app.get("/api/health")
+@app.get("/api/v1/health")
 def health_check(db: Session = Depends(get_db)):
     total = db.query(func.count(Student.id)).scalar() or 0
     return {"status": "ok", "total_students": total}
 
 
 @app.get("/api/stats/summary", response_model=DashboardSummaryResponse)
+@app.get("/api/v1/stats/summary", response_model=DashboardSummaryResponse)
 @app.get("/api/v1/dashboard/summary", response_model=DashboardSummaryResponse)
 def get_dashboard_summary(db: Session = Depends(get_db)):
     settings = get_or_create_settings(db)
@@ -278,6 +283,7 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
 
 
 @app.get("/api/students/search", response_model=List[StudentSummary])
+@app.get("/api/v1/students/search", response_model=List[StudentSummary])
 def search_students(
     q: str = Query(default="", min_length=0),
     limit: int = Query(default=12, ge=1, le=50),
@@ -516,6 +522,7 @@ def _build_student_detail(db: Session, s: Student) -> StudentDetailResponse:
 
 
 @app.get("/api/students/{roll_number}", response_model=StudentDetailResponse)
+@app.get("/api/v1/students/{roll_number}", response_model=StudentDetailResponse)
 def get_student_profile(roll_number: str, db: Session = Depends(get_db)):
     student = db.query(Student).filter(Student.roll_number == roll_number.strip().upper()).first()
     if student is None:
@@ -524,6 +531,7 @@ def get_student_profile(roll_number: str, db: Session = Depends(get_db)):
 
 
 @app.post("/api/admin/verify")
+@app.post("/api/v1/admin/verify")
 def verify_admin(_: None = Depends(require_admin)):
     return {"authenticated": True}
 
@@ -623,6 +631,7 @@ def _float_val(row: dict, key: str, default: float = 0.0) -> float:
 
 
 @app.post("/api/admin/upload-csv")
+@app.post("/api/v1/admin/upload-csv")
 async def upload_csv_metrics(
     file: Optional[UploadFile] = File(default=None),
     csv_text: Optional[str] = Form(default=None),
@@ -750,6 +759,7 @@ async def upload_csv_metrics(
 
 
 @app.post("/api/admin/sync/student/{roll_number}")
+@app.post("/api/v1/admin/sync/student/{roll_number}")
 async def sync_student_endpoint(
     roll_number: str,
     platform: str = Query(default="both"),
@@ -766,6 +776,7 @@ async def sync_student_endpoint(
 
 
 @app.post("/api/admin/sync/batch")
+@app.post("/api/v1/admin/sync/batch")
 async def start_batch_sync(
     req: BatchSyncRequest,
     _: None = Depends(require_admin),
@@ -779,11 +790,13 @@ async def start_batch_sync(
 
 
 @app.post("/api/admin/sync/stop")
+@app.post("/api/v1/admin/sync/stop")
 def stop_batch_sync(_: None = Depends(require_admin)):
     return sync_manager.request_stop()
 
 
 @app.get("/api/admin/sync-status")
+@app.get("/api/v1/admin/sync-status")
 def get_batch_sync_status(_: None = Depends(require_admin)):
     return sync_manager.get_status()
 
@@ -894,6 +907,7 @@ def unsync_student_data(
 
 
 @app.put("/api/admin/settings")
+@app.put("/api/v1/admin/settings")
 def update_settings(
     req: SettingsUpdateRequest,
     _: None = Depends(require_admin),

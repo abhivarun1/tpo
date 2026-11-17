@@ -13,6 +13,13 @@ backend/data_uploads/*.xls
 .env.*
 !.env.example
 
+# Mini-project reports & generated artifacts (privacy & repo bloat protection)
+TeddyRanks_*
+TeddyRanks_Report/
+screenshots/
+*.docx
+*.pdf
+
 # Python
 .venv/
 venv/
@@ -25,3 +32,6 @@ node_modules/
 dist/
 .vite/
 *.log
+
+# Vercel
+.vercel/
