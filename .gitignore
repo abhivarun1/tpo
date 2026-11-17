@@ -1,0 +1,27 @@
+# Student datasets & local databases (privacy protection)
+*.xlsx
+*.xls
+*.csv
+backend/data_uploads/*.xlsx
+backend/data_uploads/*.xls
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Node / Frontend
+node_modules/
+dist/
+.vite/
+*.log

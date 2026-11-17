@@ -1,0 +1,27 @@
+export function BrandLogo({
+  className = "w-7 h-7",
+  fill = "#2e5bff",
+}: {
+  className?: string;
+  fill?: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 100 100"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      aria-label="Teddy Ranks Logo"
+      role="img"
+    >
+      <path
+        fill={fill}
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M 28 20 C 33 14 42 21 50 24 C 58 21 67 14 72 20 C 82 28 86 42 86 58 C 86 76 74 88 50 88 C 26 88 14 76 14 58 C 14 42 18 28 28 20 Z M 38 47 C 34.4 47 31.5 51.5 31.5 57 C 31.5 62.5 34.4 67 38 67 C 41.6 67 44.5 62.5 44.5 57 C 44.5 51.5 41.6 47 38 47 Z M 62 47 C 58.4 47 55.5 51.5 55.5 57 C 55.5 62.5 58.4 67 62 67 C 65.6 67 68.5 62.5 68.5 57 C 68.5 51.5 65.6 47 62 47 Z"
+      />
+    </svg>
+  );
+}
+
+export default BrandLogo;
