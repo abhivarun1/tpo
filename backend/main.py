@@ -167,14 +167,20 @@ def _student_to_summary(
 
 @app.get("/api/health")
 @app.get("/api/v1/health")
+@app.get("/v1/health")
+@app.get("/health")
 def health_check(db: Session = Depends(get_db)):
     total = db.query(func.count(Student.id)).scalar() or 0
     return {"status": "ok", "total_students": total}
 
 
-@app.get("/api/stats/summary", response_model=DashboardSummaryResponse)
-@app.get("/api/v1/stats/summary", response_model=DashboardSummaryResponse)
 @app.get("/api/v1/dashboard/summary", response_model=DashboardSummaryResponse)
+@app.get("/api/v1/stats/summary", response_model=DashboardSummaryResponse)
+@app.get("/api/stats/summary", response_model=DashboardSummaryResponse)
+@app.get("/v1/dashboard/summary", response_model=DashboardSummaryResponse)
+@app.get("/v1/stats/summary", response_model=DashboardSummaryResponse)
+@app.get("/dashboard/summary", response_model=DashboardSummaryResponse)
+@app.get("/stats/summary", response_model=DashboardSummaryResponse)
 def get_dashboard_summary(db: Session = Depends(get_db)):
     settings = get_or_create_settings(db)
     students = db.query(Student).all()
@@ -296,8 +302,10 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
     )
 
 
-@app.get("/api/students/search", response_model=List[StudentSummary])
 @app.get("/api/v1/students/search", response_model=List[StudentSummary])
+@app.get("/api/students/search", response_model=List[StudentSummary])
+@app.get("/v1/students/search", response_model=List[StudentSummary])
+@app.get("/students/search", response_model=List[StudentSummary])
 def search_students(
     q: str = Query(default="", min_length=0),
     limit: int = Query(default=12, ge=1, le=50),
@@ -336,9 +344,13 @@ def _rank_key_for_tab(s: Student, tab: str):
     return (0 if s.overall_college_rank is not None else 1, s.overall_college_rank or 999999, s.roll_number)
 
 
-@app.get("/api/leaderboard", response_model=LeaderboardResponse)
-@app.get("/api/v1/leaderboard", response_model=LeaderboardResponse)
 @app.get("/api/v1/leaderboards", response_model=LeaderboardResponse)
+@app.get("/api/v1/leaderboard", response_model=LeaderboardResponse)
+@app.get("/api/leaderboard", response_model=LeaderboardResponse)
+@app.get("/v1/leaderboards", response_model=LeaderboardResponse)
+@app.get("/v1/leaderboard", response_model=LeaderboardResponse)
+@app.get("/leaderboard", response_model=LeaderboardResponse)
+@app.get("/leaderboards", response_model=LeaderboardResponse)
 def get_leaderboard(
     tab: str = Query(default="overall"),
     batch: str = Query(default="all"),
@@ -535,8 +547,10 @@ def _build_student_detail(db: Session, s: Student) -> StudentDetailResponse:
     )
 
 
-@app.get("/api/students/{roll_number}", response_model=StudentDetailResponse)
 @app.get("/api/v1/students/{roll_number}", response_model=StudentDetailResponse)
+@app.get("/api/students/{roll_number}", response_model=StudentDetailResponse)
+@app.get("/v1/students/{roll_number}", response_model=StudentDetailResponse)
+@app.get("/students/{roll_number}", response_model=StudentDetailResponse)
 def get_student_profile(roll_number: str, db: Session = Depends(get_db)):
     student = db.query(Student).filter(Student.roll_number == roll_number.strip().upper()).first()
     if student is None:
@@ -968,7 +982,12 @@ if os.path.isdir(DIST_DIR):
     @app.get("/{full_path:path}")
     async def serve_spa_fallback(full_path: str):
         # Do not hijack any API routes
-        if full_path.startswith("api/") or full_path == "api":
+        if (
+            full_path.startswith("api/")
+            or full_path.startswith("v1/")
+            or full_path in ("api", "v1")
+            or full_path.endswith("index.py")
+        ):
             raise HTTPException(status_code=404, detail="API endpoint not found")
 
         # If a specific static file exists in dist (e.g. logo.svg, favicon.ico)
