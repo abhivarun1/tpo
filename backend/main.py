@@ -1,10 +1,16 @@
+import os
+import sys
+
+BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+if BACKEND_DIR not in sys.path:
+    sys.path.insert(0, BACKEND_DIR)
+
 from contextlib import asynccontextmanager
 import csv
 from datetime import datetime, timezone
 import io
 import json
 import math
-import os
 from pathlib import Path
 import tempfile
 from typing import Any, Dict, List, Optional
@@ -40,19 +46,25 @@ DATA_UPLOADS_DIR = Path(__file__).resolve().parent / "data_uploads"
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    Base.metadata.create_all(bind=engine)
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception as exc:
+        print(f"Warning: Database create_all failed on startup: {exc}")
     try:
         DATA_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     except Exception:
         pass
-    db = SessionLocal()
     try:
-        get_or_create_settings(db)
-        student_count = db.query(func.count(Student.id)).scalar() or 0
-        if student_count == 0 and DEFAULT_EXCEL_PATH.exists():
-            ingest_excel_file(db, DEFAULT_EXCEL_PATH)
-    finally:
-        db.close()
+        db = SessionLocal()
+        try:
+            get_or_create_settings(db)
+            student_count = db.query(func.count(Student.id)).scalar() or 0
+            if student_count == 0 and DEFAULT_EXCEL_PATH.exists():
+                ingest_excel_file(db, DEFAULT_EXCEL_PATH)
+        finally:
+            db.close()
+    except Exception as exc:
+        print(f"Warning: Database startup connection failed: {exc}")
     yield
 
 
