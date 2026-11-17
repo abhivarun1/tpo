@@ -10,7 +10,8 @@ ENV_PATH = BACKEND_DIR / ".env"
 
 load_dotenv(dotenv_path=ENV_PATH)
 
-raw_db_url = os.getenv("DATABASE_URL", "").strip()
+# Clean and normalize DATABASE_URL
+raw_db_url = os.getenv("DATABASE_URL", "").strip().strip("'\"")
 
 if not raw_db_url:
     # Default to local SQLite database file
@@ -20,20 +21,16 @@ elif raw_db_url.startswith("sqlite:///./"):
     rel_path = raw_db_url[len("sqlite:///./") :]
     db_file = (BACKEND_DIR / rel_path).resolve()
     DATABASE_URL = f"sqlite:///{db_file.as_posix()}"
+elif raw_db_url.startswith("sqlite:///"):
+    DATABASE_URL = raw_db_url
 elif raw_db_url.startswith("postgres://"):
-    # Fix Heroku/Vercel/Neon legacy postgres:// schema for SQLAlchemy
-    converted = raw_db_url.replace("postgres://", "postgresql://", 1)
-    try:
-        import psycopg2  # type: ignore # noqa: F401
-        DATABASE_URL = converted.replace("postgresql://", "postgresql+psycopg2://", 1)
-    except ImportError:
-        DATABASE_URL = converted
+    # Normalize legacy Heroku/Vercel/Supabase postgres:// scheme to postgresql+psycopg2://
+    normalized = "postgresql+psycopg2://" + raw_db_url[len("postgres://"):]
+    DATABASE_URL = normalized
 elif raw_db_url.startswith("postgresql://") and not raw_db_url.startswith("postgresql+"):
-    try:
-        import psycopg2  # type: ignore # noqa: F401
-        DATABASE_URL = raw_db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
-    except ImportError:
-        DATABASE_URL = raw_db_url
+    # Ensure psycopg2 driver is explicitly used for Supabase / PostgreSQL URLs
+    normalized = "postgresql+psycopg2://" + raw_db_url[len("postgresql://"):]
+    DATABASE_URL = normalized
 else:
     DATABASE_URL = raw_db_url
 
@@ -48,7 +45,7 @@ connect_args = {"check_same_thread": False} if is_sqlite else {}
 engine_kwargs = {"future": True, "connect_args": connect_args}
 
 if not is_sqlite:
-    # Serverless database connection optimizations (PostgreSQL / Neon / Supabase)
+    # Optimized pool configuration for serverless PostgreSQL (Supabase / Neon)
     engine_kwargs.update({
         "pool_pre_ping": True,
         "pool_recycle": 300,

@@ -51,7 +51,7 @@ export function Navbar() {
       setLoading(true);
       try {
         const items = await searchStudents(q, 8);
-        setResults(items);
+        setResults(Array.isArray(items) ? items : []);
         setOpen(true);
       } catch {
         setResults([]);
@@ -155,7 +155,7 @@ export function Navbar() {
                 <div className="px-4 py-3 text-xs text-[#606060]">No student match for "{query}"</div>
               ) : (
                 <ul className="divide-y divide-[#e0e0df]">
-                  {results.map((s) => (
+                  {Array.isArray(results) && results.map((s) => (
                     <li key={s.roll_number}>
                       <button
                         type="button"
