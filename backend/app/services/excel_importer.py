@@ -317,6 +317,9 @@ def ingest_single_excel_file(db: Session, excel_path: Path, auto_sync: bool = Fa
 
                 updated += 1
 
+            if (inserted + updated) % 250 == 0:
+                db.commit()
+
     db.commit()
 
     # Recalculate rankings
@@ -382,7 +385,10 @@ def scan_and_ingest_folder(db: Session, folder_path: Path, auto_sync: bool = Fal
     If folder is empty, fallback to looking for dataset in parent folder.
     """
     if not folder_path.exists():
-        folder_path.mkdir(parents=True, exist_ok=True)
+        try:
+            folder_path.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            pass
 
     files = list(folder_path.glob("*.xlsx")) + list(folder_path.glob("*.xls"))
     results = []

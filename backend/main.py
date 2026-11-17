@@ -19,11 +19,11 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from collectors import sync_manager, sync_single_student
-from database import Base, DEFAULT_EXCEL_PATH, SessionLocal, engine, get_db
+from database import Base, DEFAULT_EXCEL_PATH, SessionLocal, engine, ensure_tables_exist, get_db
 from ingest_excel import ingest_excel_file
 from models import AuditLog, MetricSnapshot, Student, SystemSettings
 from ranking import create_snapshot, get_or_create_settings, recalculate_all_rankings
@@ -43,13 +43,22 @@ from schemas import (
 )
 from app.services.excel_importer import ingest_single_excel_file, scan_and_ingest_folder
 
-DATA_UPLOADS_DIR = Path(__file__).resolve().parent / "data_uploads"
+DATA_UPLOADS_DIR = Path(tempfile.gettempdir()) / "data_uploads"
+try:
+    DATA_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+except OSError:
+    pass
+
+try:
+    ensure_tables_exist()
+except Exception as _init_exc:
+    print(f"Warning: Module-level ensure_tables_exist: {_init_exc}")
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     try:
-        Base.metadata.create_all(bind=engine)
+        ensure_tables_exist()
     except Exception as exc:
         print(f"Warning: Database create_all failed on startup: {exc}")
     try:
@@ -169,10 +178,29 @@ def _student_to_summary(
 @app.get("/api/v1/health")
 @app.get("/v1/health")
 @app.get("/health")
-def health_check(db: Session = Depends(get_db)):
-    total = db.query(func.count(Student.id)).scalar() or 0
+def health_check():
     routes_list = [getattr(r, "path", str(r)) for r in app.routes if hasattr(r, "path")]
-    return {"status": "ok", "total_students": total, "routes": sorted(set(routes_list))}
+    try:
+        ensure_tables_exist()
+        db = SessionLocal()
+        try:
+            db.execute(text("SELECT 1"))
+            total = db.query(func.count(Student.id)).scalar() or 0
+            return {
+                "status": "ok",
+                "db": "connected",
+                "total_students": total,
+                "routes": sorted(set(routes_list)),
+            }
+        finally:
+            db.close()
+    except Exception as exc:
+        return {
+            "status": "error",
+            "db": "error",
+            "db_error": str(exc),
+            "routes": sorted(set(routes_list)),
+        }
 
 
 @app.get("/api/v1/dashboard/summary", response_model=DashboardSummaryResponse)
@@ -582,7 +610,10 @@ async def upload_excel_dataset(
     db: Session = Depends(get_db),
 ):
     if use_default:
-        return ingest_single_excel_file(db, DEFAULT_EXCEL_PATH, auto_sync=auto_sync)
+        try:
+            return ingest_single_excel_file(db, DEFAULT_EXCEL_PATH, auto_sync=auto_sync)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Default dataset ingestion failed: {exc}")
 
     file_list = []
     if files:
@@ -593,7 +624,10 @@ async def upload_excel_dataset(
     if not file_list:
         raise HTTPException(status_code=400, detail="Please upload at least one .xlsx file or select use_default=true")
 
-    DATA_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        DATA_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
     results = []
 
     for f in file_list:
@@ -603,14 +637,17 @@ async def upload_excel_dataset(
 
         save_path = DATA_UPLOADS_DIR / fname
         content = await f.read()
-        with open(save_path, "wb") as out:
-            out.write(content)
+        try:
+            with open(save_path, "wb") as out:
+                out.write(content)
+        except OSError as e:
+            raise HTTPException(status_code=500, detail=f"Could not save uploaded file {fname} to temporary storage: {e}")
 
         try:
             summary = ingest_single_excel_file(db, save_path, auto_sync=False)
             results.append(summary)
         except Exception as exc:
-            results.append({"file_name": fname, "error": str(exc), "status": "FAILED"})
+            raise HTTPException(status_code=500, detail=f"Failed to ingest {fname}: {exc}")
 
     if not results:
         raise HTTPException(status_code=400, detail="No valid .xlsx files could be processed")
@@ -634,7 +671,10 @@ def scan_and_import_folder_endpoint(
     _: None = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    DATA_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        DATA_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
     res = scan_and_ingest_folder(db, DATA_UPLOADS_DIR, auto_sync=auto_sync)
     return res
 

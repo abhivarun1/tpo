@@ -193,9 +193,14 @@ export function AdminPanel() {
         file: !useDefault && excelFiles.length === 0 ? excelFile || undefined : undefined,
         autoSync: autoSyncAfterImport,
       });
-      setIngestReport(rep);
-      await loadDashboard();
-      await loadAuditLogs();
+      if (rep && (rep.status === "FAILED" || rep.error)) {
+        setIngestError(rep.error || "File processing failed");
+        setIngestReport(null);
+      } else {
+        setIngestReport(rep);
+        await loadDashboard();
+        await loadAuditLogs();
+      }
     } catch (err) {
       setIngestError(err instanceof Error ? err.message : "Ingestion failed");
     } finally {
