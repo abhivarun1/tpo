@@ -171,7 +171,8 @@ def _student_to_summary(
 @app.get("/health")
 def health_check(db: Session = Depends(get_db)):
     total = db.query(func.count(Student.id)).scalar() or 0
-    return {"status": "ok", "total_students": total}
+    routes_list = [getattr(r, "path", str(r)) for r in app.routes if hasattr(r, "path")]
+    return {"status": "ok", "total_students": total, "routes": sorted(set(routes_list))}
 
 
 @app.get("/api/v1/dashboard/summary", response_model=DashboardSummaryResponse)
@@ -560,6 +561,12 @@ def get_student_profile(roll_number: str, db: Session = Depends(get_db)):
 
 @app.post("/api/admin/verify")
 @app.post("/api/v1/admin/verify")
+@app.post("/api/admin/login")
+@app.post("/api/v1/admin/login")
+@app.post("/v1/admin/verify")
+@app.post("/v1/admin/login")
+@app.post("/admin/verify")
+@app.post("/admin/login")
 def verify_admin(_: None = Depends(require_admin)):
     return {"authenticated": True}
 
