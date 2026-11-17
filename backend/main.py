@@ -2,8 +2,10 @@ import os
 import sys
 
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
-if BACKEND_DIR not in sys.path:
-    sys.path.insert(0, BACKEND_DIR)
+ROOT_DIR = os.path.dirname(BACKEND_DIR)
+for p in (ROOT_DIR, BACKEND_DIR):
+    if p not in sys.path:
+        sys.path.insert(0, p)
 
 from contextlib import asynccontextmanager
 import csv
@@ -945,3 +947,38 @@ def update_settings(
         "mask_roll_numbers": settings.mask_roll_numbers,
         "ranking_summary": ranking_summary,
     }
+
+
+# =========================================================================
+# React SPA Static Files & Fallback Serving (Belt-and-Suspenders)
+# =========================================================================
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+DIST_DIR = os.path.join(ROOT_DIR, "frontend", "dist")
+if not os.path.isdir(DIST_DIR):
+    DIST_DIR = os.path.join(BACKEND_DIR, "..", "frontend", "dist")
+DIST_DIR = os.path.abspath(DIST_DIR)
+
+if os.path.isdir(DIST_DIR):
+    assets_dir = os.path.join(DIST_DIR, "assets")
+    if os.path.isdir(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa_fallback(full_path: str):
+        # Do not hijack any API routes
+        if full_path.startswith("api/") or full_path == "api":
+            raise HTTPException(status_code=404, detail="API endpoint not found")
+
+        # If a specific static file exists in dist (e.g. logo.svg, favicon.ico)
+        target_file = os.path.join(DIST_DIR, full_path)
+        if full_path and os.path.isfile(target_file):
+            return FileResponse(target_file)
+
+        # Fallback to SPA index.html for all client routes
+        index_file = os.path.join(DIST_DIR, "index.html")
+        if os.path.isfile(index_file):
+            return FileResponse(index_file)
+
+        return {"message": "Teddy Ranks API"}
